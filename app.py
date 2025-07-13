@@ -2,10 +2,16 @@ from flask import Flask, render_template, request, jsonify, session
 from openai import OpenAI
 from flask_cors import CORS
 import random, string, threading, json, time
+from dotenv import load_dotenv
+import os
 
 app = Flask(__name__)
 CORS(app)
 app.secret_key = 'haiguitang-secret-key'  # 用于session
+
+# 加载.env文件
+load_dotenv()
+PRESET = os.getenv('preset', None)
 
 # 内存房间存储
 rooms = {}
@@ -152,9 +158,13 @@ def send_message():
             story = room['stories'][room['current_story']]
             additional = story.get('additional', '')
             victory_condition = story.get('victory_condition', '')
-            preset = f"你现在是海龟汤推理游戏的主持人。当前题目如下：\n\n汤面：{story.get('surface', '')}\n\n游戏规则：出题者先给出不完整的'汤面'（题目），让猜题者提出各种可能性的问题，而出题者只能回答'是'、'不是'或'不重要'。猜题者在有限的线索中推理出事件的始末，拼出故事的全貌，凑出一个'汤底'（答案）。你只需根据规则回答问题，不要直接给出答案。同时会给出胜利条件，由你来决定是否过关。\n\n补充说明（仅供AI参考）：{additional}\n\n胜利条件：{victory_condition}"
+            # 优先使用.env中的preset
+            if PRESET and PRESET.strip():
+                preset = PRESET
+            else:
+                preset = f"你现在是海龟汤推理游戏的主持人。当前题目如下：\n\n汤面：{story.get('surface', '')}\n\n游戏规则：出题者先给出不完整的'汤面'（题目），让猜题者提出各种可能性的问题，而出题者只能回答'是'、'不是'或'不重要'；如果只是一部分对的但是另外一部分不对造成回答对于不对都不准确，就回答'是也不是'。猜题者在有限的线索中推理出事件的始末，拼出故事的全貌，凑出一个'汤底'（答案）。你只需根据规则回答问题，不要直接给出答案。同时会给出胜利条件，由你来决定是否过关。\n\n补充说明（仅供AI参考）：{additional}\n\n胜利条件：{victory_condition}"
         else:
-            preset = "当前房间还没有上传题目，请房主上传海龟汤题目（json文件）。"
+            preset = PRESET if PRESET and PRESET.strip() else "当前房间还没有上传题目，请房主上传海龟汤题目（json文件）。"
         messages = [
             {'role': 'system', 'content': preset}
         ]
