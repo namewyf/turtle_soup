@@ -4,6 +4,8 @@ from flask_cors import CORS
 import random, string, threading, json, time
 from dotenv import load_dotenv
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import uuid
 
 app = Flask(__name__)
 CORS(app)
@@ -12,10 +14,26 @@ app.secret_key = 'haiguitang-secret-key'  # 用于session
 # 加载.env文件
 load_dotenv()
 PRESET = os.getenv('preset', None)
+CUSTOM_STORY_RESTORE_GUIDE = (
+    "【重要规则补充】\n"
+    "1. 当玩家的提问以‘开始故事还原：’开头时，只能回复：故事还原错误、故事还原正确、故事还原大致正确三种标签，回复内容只能是这三个标签之一，不能有其他内容、提示、解释或标点，用户会自行揭晓谜底或继续提问。\n"
+    "- 绝对不能给出任何提示、解释或标点。\n"
+    "2. 当玩家回复‘整理线索’时，请你整理之前所有AI回答中有用的线索和不重要的线索：\n"
+    "- 只总结AI已经明确回答过的有用线索和不重要的线索，绝对不要展开联想，绝对不要根据汤底推测未被问到的内容。\n"
+    "- ‘是’或‘不是’的问题，如果无法确定线索可输出‘不确定’。\n"
+    "- ‘不重要’的信息要单独整理和汇报。\n"
+    "- 整理时要简明扼要，避免剧透和过度推理。\n"
+    "其余时间请严格按照海龟汤规则进行推理问答。"
+)
 
 # 内存房间存储
 rooms = {}
 rooms_lock = threading.Lock()
+
+# 全局线程池
+ai_executor = ThreadPoolExecutor(max_workers=8)
+# 存储AI异步任务结果
+ai_tasks = {}
 
 def gen_code(length=6):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
@@ -145,6 +163,7 @@ def send_message():
     content = data.get('content')
     if not (code and nickname and content):
         return jsonify({'error': '参数不完整'}), 400
+    # 1. 先加锁写入用户消息，复制room和messages
     with rooms_lock:
         room = rooms.get(code)
         if not room:
@@ -152,38 +171,73 @@ def send_message():
         if nickname not in room['members']:
             return jsonify({'error': '未加入房间'}), 403
         room['messages'].append({'role': 'user', 'content': content, 'nickname': nickname})
-        # 题目预设
+        room_copy = {
+            'base_url': room['base_url'],
+            'api_key': room['api_key'],
+            'model': room['model'],
+            'stories': room.get('stories'),
+            'current_story': room.get('current_story'),
+        }
+        messages_copy = list(room['messages'])
+    # 2. 生成唯一消息ID
+    msg_id = str(uuid.uuid4())
+    # 3. 在线程池中异步执行AI调用
+    def ai_task():
         preset = ''
-        if 'stories' in room and room.get('current_story') is not None:
-            story = room['stories'][room['current_story']]
+        if room_copy['stories'] and room_copy.get('current_story') is not None:
+            story = room_copy['stories'][room_copy['current_story']]
             additional = story.get('additional', '')
             victory_condition = story.get('victory_condition', '')
-            # 优先使用.env中的preset
             if PRESET and PRESET.strip():
-                preset = PRESET
+                preset = PRESET + '\n' + CUSTOM_STORY_RESTORE_GUIDE
             else:
-                preset = f"你现在是海龟汤推理游戏的主持人。当前题目如下：\n\n汤面：{story.get('surface', '')}\n\n游戏规则：出题者先给出不完整的'汤面'（题目），让猜题者提出各种可能性的问题，而出题者只能回答'是'、'不是'或'不重要'；如果只是一部分对的但是另外一部分不对造成回答对于不对都不准确，就回答'是也不是'。猜题者在有限的线索中推理出事件的始末，拼出故事的全貌，凑出一个'汤底'（答案）。你只需根据规则回答问题，不要直接给出答案。同时会给出胜利条件，由你来决定是否过关。\n\n补充说明（仅供AI参考）：{additional}\n\n胜利条件：{victory_condition}"
+                preset = f"你现在是海龟汤推理游戏的主持人。当前题目如下：\n\n汤面：{story.get('surface', '')}\n\n游戏规则：出题者先给出不完整的'汤面'（题目），让猜题者提出各种可能性的问题，而出题者只能回答'是'、'不是'或'不重要'。猜题者在有限的线索中推理出事件的始末，拼出故事的全貌，凑出一个'汤底'（答案）。你只需根据规则回答问题，不要直接给出答案。同时会给出胜利条件，由你来决定是否过关。\n\n补充说明（仅供AI参考）：{additional}\n\n胜利条件：{victory_condition}\n" + CUSTOM_STORY_RESTORE_GUIDE
         else:
-            preset = PRESET if PRESET and PRESET.strip() else "当前房间还没有上传题目，请房主上传海龟汤题目（json文件）。"
+            preset = (PRESET + '\n' + CUSTOM_STORY_RESTORE_GUIDE) if PRESET and PRESET.strip() else "当前房间还没有上传题目，请房主上传海龟汤题目（json文件）。"
         messages = [
             {'role': 'system', 'content': preset}
         ]
-        for msg in room['messages']:
+        for msg in messages_copy:
             if msg['role'] == 'user':
                 messages.append({'role': 'user', 'content': f"{msg['nickname']}: {msg['content']}"})
             elif msg['role'] == 'assistant':
                 messages.append({'role': 'assistant', 'content': msg['content']})
         try:
-            client = OpenAI(base_url=room['base_url'], api_key=room['api_key'])
+            client = OpenAI(base_url=room_copy['base_url'], api_key=room_copy['api_key'])
             completion = client.chat.completions.create(
-                model=room['model'],
+                model=room_copy['model'],
                 messages=messages
             )
             reply = completion.choices[0].message.content
-            room['messages'].append({'role': 'assistant', 'content': reply, 'nickname': 'AI'})
-            return jsonify({'reply': reply})
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            reply = f'[AI错误]{str(e)}'
+        popup = None
+        with rooms_lock:
+            room = rooms.get(code)
+            if not room:
+                return {'error': '房间不存在'}
+            room['messages'].append({'role': 'assistant', 'content': reply, 'nickname': 'AI'})
+            if '故事还原正确' in reply or '故事还原大致正确' in reply:
+                popup = '恭喜过关'
+                room['passed'] = True
+        return {'reply': reply, 'popup': popup}
+    future = ai_executor.submit(ai_task)
+    ai_tasks[msg_id] = future
+    return jsonify({'msg_id': msg_id, 'status': 'pending'})
+
+@app.route('/api/get_ai_reply', methods=['POST'])
+def get_ai_reply():
+    data = request.json
+    msg_id = data.get('msg_id')
+    if not msg_id or msg_id not in ai_tasks:
+        return jsonify({'error': '无效的消息ID'}), 400
+    future = ai_tasks[msg_id]
+    if future.done():
+        result = future.result()
+        del ai_tasks[msg_id]
+        return jsonify(result)
+    else:
+        return jsonify({'status': 'pending'})
 
 @app.route('/api/get_messages', methods=['POST'])
 def get_messages():
@@ -195,7 +249,7 @@ def get_messages():
         room = rooms.get(code)
         if not room:
             return jsonify({'error': '房间不存在'}), 404
-        return jsonify({'messages': room['messages']})
+        return jsonify({'messages': room['messages'], 'passed': room.get('passed', False)})
 
 @app.route('/api/delete_room', methods=['POST'])
 def delete_room():
