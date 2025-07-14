@@ -92,8 +92,15 @@
         .room-info { text-align: center; color: #64748b; margin-bottom: 10px; }
         .delete-btn { background: #f87171; margin-top: 10px; }
         @media (max-width: 600px) {
-            .container { padding: 18px 4px 10px 4px; margin-top: 10px; }
-            #chat-box { height: 220px; }
+            .main-layout { flex-direction: column !important; align-items: stretch !important; }
+            .container { max-width: 100vw !important; margin-right: 0 !important; margin-top: 10px !important; border-radius: 0 !important; box-shadow: none !important; padding: 12px 4px 10px 4px !important; }
+            #user-list-panel { max-width: 100vw !important; min-width: 0 !important; margin-top: 10px !important; border-radius: 0 !important; box-shadow: none !important; padding: 10px 4px 10px 4px !important; order: 2; }
+            .btn, input[type=text], input[type=password] { font-size: 17px !important; width: 100% !important; box-sizing: border-box !important; }
+            .form-group { margin-bottom: 14px !important; }
+            #page-chat { flex-direction: column; }
+            .input-row { flex-direction: column !important; gap: 6px; margin-top: 8px; margin-bottom: 0; }
+            #user-input { font-size: 17px; padding: 10px 10px; border-radius: 8px; min-width: 0; width: 100%; }
+            #send-btn { min-width: 60px; font-size: 17px; padding: 0 10px; height: 40px; width: 100%; }
         }
     </style>
 </head>
