@@ -9,23 +9,24 @@ function showPage(page) {
     }
 }
 
+document.addEventListener('DOMContentLoaded', function() {
 // 全局状态
 let roomCode = '';
 let nickname = '';
 let isOwner = false;
 let polling = null;
 let isUploading = false;
-
 // 当前题目信息缓存
 let currentStoryInfo = null;
 let isAnswerRevealed = false;
-
 // ========== 无AI群聊相关 ==========
 let chatPolling = null;
 let onlinePolling = null;
-
+let sendBtn;
+let createBtn;
+let joinBtn;
 // 创建房间
-const createBtn = document.getElementById('create-room-btn');
+createBtn = document.getElementById('create-room-btn');
 createBtn.onclick = async function() {
     const nick = document.getElementById('create-nickname').value.trim();
     const base_url = document.getElementById('create-base-url').value.trim();
@@ -57,9 +58,8 @@ createBtn.onclick = async function() {
     }
     createBtn.disabled = false;
 };
-
 // 加入房间
-const joinBtn = document.getElementById('join-room-btn');
+joinBtn = document.getElementById('join-room-btn');
 joinBtn.onclick = async function() {
     const nick = document.getElementById('join-nickname').value.trim();
     const code = document.getElementById('join-code').value.trim().toUpperCase();
@@ -110,23 +110,20 @@ function enterChat(roomInfo) {
     chatPolling = setInterval(pollChatMessages, 2000);
     onlinePolling = setInterval(pollOnlineUsers, 5000);
     startHeartbeat();
+    // 在进入房间时重置弹窗标志
+    window._popupPassedFlag = false;
 }
 
 // 发送消息
-const sendBtn = document.getElementById('send-btn');
+sendBtn = document.getElementById('send-btn');
 sendBtn.onclick = async function() {
     const content = document.getElementById('user-input').value.trim();
     if (!content) return;
     sendBtn.disabled = true;
     document.getElementById('user-input').disabled = true;
     try {
-        await fetch('/api/send_message', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({code: roomCode, nickname, content})
-        });
+        await sendAIMessage(content);
         document.getElementById('user-input').value = '';
-        await pollMessages();
     } catch (e) {}
     sendBtn.disabled = false;
     document.getElementById('user-input').disabled = false;
@@ -157,10 +154,16 @@ async function pollMessages() {
         if (data.messages) {
             renderMessages(data.messages);
         }
+        // 新增：全房间弹窗过关
+        if (data.passed && !window._popupPassedFlag) {
+            window._popupPassedFlag = true;
+            showPopup('恭喜过关');
+        }
     } catch (e) {}
 }
 function renderMessages(msgs) {
     const chatBox = document.getElementById('chat-box');
+    const isAtBottom = chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 10;
     chatBox.innerHTML = '';
     for (const msg of msgs) {
         if (msg.role === 'system') {
@@ -175,7 +178,9 @@ function renderMessages(msgs) {
         div.innerHTML = `<span class=\"msg-nickname\">${msg.nickname}</span>: ${escapeHtml(msg.content)}`;
         chatBox.appendChild(div);
     }
-    chatBox.scrollTop = chatBox.scrollHeight;
+    if (isAtBottom) {
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
 }
 function escapeHtml(text) {
     if (!text) return '';
@@ -410,6 +415,12 @@ window.addEventListener('DOMContentLoaded', loadSession);
 // 默认显示首页
 showPage('home');
 
+let leaveRoomBtn;
+leaveRoomBtn = document.querySelector('button[onclick="leaveRoom()"]');
+if (leaveRoomBtn) {
+    leaveRoomBtn.onclick = function() { leaveRoom(); };
+}
+
 function renderChatMessages(msgs) {
     const box = document.getElementById('chat-box-chat');
     box.innerHTML = '';
@@ -527,6 +538,17 @@ document.getElementById('chat-input').addEventListener('keydown', function(e) {
     }
 });
 
+// 聊天输入框支持多行
+const userInput = document.getElementById('user-input');
+if (userInput) {
+    userInput.setAttribute('rows', '1');
+    userInput.setAttribute('style', 'resize:vertical;min-height:40px;max-height:120px;');
+    userInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+}
+
 // 心跳机制
 function startHeartbeat() {
     setInterval(async () => {
@@ -538,3 +560,121 @@ function startHeartbeat() {
         });
     }, 30000);
 } 
+
+// 弹窗函数
+function showPopup(msg) {
+    let popup = document.createElement('div');
+    popup.style.position = 'fixed';
+    popup.style.left = '50%';
+    popup.style.top = '30%';
+    popup.style.transform = 'translate(-50%, -50%)';
+    popup.style.background = 'rgba(255,255,255,0.98)';
+    popup.style.fontWeight = 'bold';
+    popup.style.fontSize = '2.2rem';
+    popup.style.padding = '36px 60px 32px 60px';
+    popup.style.borderRadius = '22px';
+    popup.style.boxShadow = '0 12px 40px 0 rgba(31,38,135,0.18)';
+    popup.style.zIndex = 9999;
+    popup.style.display = 'flex';
+    popup.style.flexDirection = 'column';
+    popup.style.alignItems = 'center';
+    // 彩色渐变字体
+    popup.style.backgroundClip = 'padding-box';
+    let text = document.createElement('div');
+    text.textContent = msg;
+    text.style.background = 'linear-gradient(90deg, #3b82f6 10%, #a21caf 90%)';
+    text.style.webkitBackgroundClip = 'text';
+    text.style.webkitTextFillColor = 'transparent';
+    text.style.backgroundClip = 'text';
+    text.style.textFillColor = 'transparent';
+    text.style.fontWeight = 'bold';
+    text.style.fontSize = '2.2rem';
+    text.style.textAlign = 'center';
+    popup.appendChild(text);
+    // 关闭按钮
+    let closeBtn = document.createElement('span');
+    closeBtn.textContent = '×';
+    closeBtn.style.position = 'absolute';
+    closeBtn.style.top = '12px';
+    closeBtn.style.right = '24px';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.fontSize = '2rem';
+    closeBtn.style.color = '#a21caf';
+    closeBtn.style.fontWeight = 'bold';
+    closeBtn.onclick = function() { popup.remove(); };
+    popup.appendChild(closeBtn);
+    document.body.appendChild(popup);
+}
+
+// 发送AI消息时按钮转圈圈
+let sendBtnOriginal = sendBtn.innerHTML;
+async function sendAIMessage(content) {
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<span class="spinner" style="display:inline-block;width:22px;height:22px;border:3px solid #3b82f6;border-top:3px solid #fff;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle;"></span>';
+    let msg_id = null;
+    try {
+        const res = await fetch('/api/send_message', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code: roomCode, nickname, content})
+        });
+        const data = await res.json();
+        if (data.msg_id) {
+            msg_id = data.msg_id;
+        } else if (data.reply) {
+            // 兼容老接口
+            await pollMessages();
+            if (data.popup === '恭喜过关') showPopup('恭喜过关');
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = sendBtnOriginal;
+            return;
+        } else {
+            alert(data.error || 'AI消息发送失败');
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = sendBtnOriginal;
+            return;
+        }
+    } catch (e) {
+        alert('AI消息发送失败');
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = sendBtnOriginal;
+        return;
+    }
+    // 轮询AI回复
+    let start = Date.now();
+    let gotReply = false;
+    while (!gotReply && Date.now() - start < 30000) {
+        await new Promise(r => setTimeout(r, 800));
+        try {
+            const res2 = await fetch('/api/get_ai_reply', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({msg_id})
+            });
+            const data2 = await res2.json();
+            if (data2.status === 'pending') continue;
+            if (data2.reply) {
+                await pollMessages();
+                if (data2.popup === '恭喜过关') showPopup('恭喜过关');
+                gotReply = true;
+                break;
+            } else if (data2.error) {
+                alert(data2.error);
+                break;
+            }
+        } catch (e) {
+            alert('AI回复获取失败');
+            break;
+        }
+    }
+    if (!gotReply) {
+        alert('AI回复超时，请重试');
+    }
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = sendBtnOriginal;
+}
+// 加入转圈动画样式
+const style = document.createElement('style');
+style.innerHTML = `@keyframes spin { 0% { transform: rotate(0deg);} 100% {transform: rotate(360deg);} }`;
+document.head.appendChild(style); 
+}); 
