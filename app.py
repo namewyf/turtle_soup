@@ -322,6 +322,12 @@ def upload_story():
             room['stories'] = []
         files = request.files.getlist('file')
         for file in files:
+            # 检查文件大小限制 (20MB = 20 * 1024 * 1024 bytes)
+            file.seek(0, 2)  # 移动到文件末尾
+            file_size = file.tell()  # 获取文件大小
+            file.seek(0)  # 重置文件指针到开头
+            if file_size > 20 * 1024 * 1024:  # 20MB
+                return jsonify({'error': '文件大小不能超过20MB'}), 400
             try:
                 story = json.load(file)
                 if isinstance(story, list):
@@ -418,6 +424,12 @@ def upload_to_plaza():
         return jsonify({'error': '没有选择文件'}), 400
     if not file.filename.endswith('.json'):
         return jsonify({'error': '只支持JSON文件'}), 400
+    # 检查文件大小限制 (20MB = 20 * 1024 * 1024 bytes)
+    file.seek(0, 2)  # 移动到文件末尾
+    file_size = file.tell()  # 获取文件大小
+    file.seek(0)  # 重置文件指针到开头
+    if file_size > 20 * 1024 * 1024:  # 20MB
+        return jsonify({'error': '文件大小不能超过20MB'}), 400
     try:
         # 读取文件内容
         content = file.read().decode('utf-8')
