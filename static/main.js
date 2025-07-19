@@ -100,6 +100,7 @@ function enterChat(roomInfo) {
     document.getElementById('user-input').value = '';
     document.getElementById('chat-box').innerHTML = '';
     document.getElementById('story-ops').style.display = isOwner ? '' : 'none';
+    setupUploadBtn(); // 设置上传按钮
     fetchCurrentStory();
     startPolling();
     saveSession();
@@ -223,13 +224,8 @@ function renderStory(story) {
     if (!story) {
         html = '<em>暂无题目，请房主上传海龟汤题目</em>';
     } else {
-        html += `<div style=\"margin-bottom:8px;\"><b>汤面：</b>${escapeHtml(story.surface || '')}</div>`;
-        if (story.victory_condition) {
-            html += `<div style=\"color:#64748b;\"><b>胜利条件：</b>${escapeHtml(story.victory_condition)}</div>`;
-        }
-        if (story.answer && story.answer.length > 0) {
-            html += `<div style=\"color:#f87171;margin-top:8px;\"><b>答案揭晓：</b>${escapeHtml(story.answer)}</div>`;
-        }
+        html += `<div style=\"margin-bottom:8px;\">${escapeHtml(story.surface || '')}</div>`;
+        // 删除揭晓答案的显示，只在聊天框中显示
     }
     // 房主操作区
     if (isOwner && story) {
@@ -251,67 +247,179 @@ function renderStory(story) {
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({code: roomCode, nickname})
                 });
-                await fetchCurrentStory();
-                await pollMessages();
+                fetchCurrentStory();
             };
         }
     }
-    updateInputStatus();
 }
 
-function updateInputStatus() {
-    const userInput = document.getElementById('user-input');
-    const sendBtn = document.getElementById('send-btn');
-    if (!currentStoryInfo) {
-        userInput.disabled = true;
-        sendBtn.disabled = true;
-        return;
-    }
-    if (isAnswerRevealed) {
-        userInput.disabled = true;
-        sendBtn.disabled = true;
-        return;
-    }
-    userInput.disabled = false;
-    sendBtn.disabled = false;
-}
-
-async function fetchCurrentStory() {
-    if (!roomCode) return;
+// 新增：从故事广场加载故事
+async function loadStoryFromPlaza(filename) {
     try {
-        const res = await fetch('/api/get_current_story', {
+        const response = await fetch('/api/load_story_from_plaza', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({code: roomCode})
+            body: JSON.stringify({code: roomCode, nickname, filename})
         });
-        const data = await res.json();
-        if (data.surface !== undefined) {
-            renderStory({surface: data.surface, additional: data.additional});
+        const data = await response.json();
+        if (data.success) {
+            alert('故事加载成功');
+            fetchCurrentStory();
+            fetchStoryList && fetchStoryList();
         } else {
-            renderStory(null);
+            alert('加载失败：' + (data.error || '未知错误'));
         }
-    } catch (e) {
-        renderStory(null);
+    } catch (error) {
+        alert('加载失败：网络错误');
     }
 }
 
-// 上传题目
+// 新增：获取故事广场列表
+async function getPlazaStories() {
+    try {
+        const response = await fetch('/api/get_plaza_stories');
+        const data = await response.json();
+        return data.stories;
+    } catch (error) {
+        console.error('获取故事广场失败:', error);
+        return [];
+    }
+}
+
+// 新增：显示故事广场选择窗口（美化弹窗+下拉）
+async function showPlazaStorySelector() {
+    const stories = await getPlazaStories();
+    if (stories.length === 0) {
+        alert('故事广场暂无故事');
+        return;
+    }
+    // 构建弹窗
+    let modal = document.getElementById('plaza-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'plaza-modal';
+        modal.style = 'display:flex;position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:999;align-items:center;justify-content:center;';
+        modal.innerHTML = `
+        <div style="background:#fff;padding:32px 24px;border-radius:16px;box-shadow:0 8px 32px 0 rgba(31,38,135,0.15);max-width:340px;width:90vw;">
+            <h3 style="color:#3b82f6;text-align:center;margin-bottom:18px;">从故事广场加载</h3>
+            <form id="plaza-select-form">
+                <div class="form-group">
+                    <label>选择故事编号</label>
+                    <select id="plaza-story-select" style="width:100%;padding:8px 6px;border-radius:8px;border:1.5px solid #cbd5e1;font-size:15px;background:#f8fafc;">
+                        ${stories.map(story => `<option value="${story.filename}">${story.name} ${story.id}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>或直接输入编号</label>
+                    <input type="text" id="plaza-story-input" placeholder="如: #00001" style="width:100%;padding:8px 6px;border-radius:8px;border:1.5px solid #cbd5e1;font-size:15px;background:#f8fafc;">
+                    <div id="plaza-story-match" style="margin-top:4px;font-size:13px;color:#64748b;"></div>
+                </div>
+                <button class="btn start-btn" type="submit" style="width:100%;margin-top:10px;">加载</button>
+                <button class="btn" type="button" onclick="closePlazaModal()" style="width:100%;background:#e5e7eb;color:#334155;margin-top:8px;">取消</button>
+            </form>
+            <div id="plaza-select-result" style="margin-top:10px;"></div>
+        </div>`;
+        document.body.appendChild(modal);
+        window.closePlazaModal = function() { modal.style.display = 'none'; };
+        
+        // 输入编号时自动匹配
+        const input = modal.querySelector('#plaza-story-input');
+        const matchDiv = modal.querySelector('#plaza-story-match');
+        input.addEventListener('input', function() {
+            const inputValue = this.value.trim();
+            if (inputValue) {
+                const matchedStory = stories.find(story => story.id === inputValue);
+                if (matchedStory) {
+                    matchDiv.innerHTML = `匹配到: ${matchedStory.name}`;
+                    matchDiv.style.color = '#10b981';
+                } else {
+                    matchDiv.innerHTML = '未找到该编号的故事';
+                    matchDiv.style.color = '#f87171';
+                }
+            } else {
+                matchDiv.innerHTML = '';
+            }
+        });
+        
+        document.getElementById('plaza-select-form').onsubmit = async function(e) {
+            e.preventDefault();
+            const filename = document.getElementById('plaza-story-select').value;
+            const inputValue = document.getElementById('plaza-story-input').value.trim();
+            let targetFilename = filename;
+            
+            // 如果输入了编号，优先使用输入的编号
+            if (inputValue) {
+                const matchedStory = stories.find(story => story.id === inputValue);
+                if (matchedStory) {
+                    targetFilename = matchedStory.filename;
+                } else {
+                    document.getElementById('plaza-select-result').innerHTML = '<div class="error">未找到该编号的故事</div>';
+                    return;
+                }
+            }
+            
+            if (!targetFilename) return;
+            try {
+                const response = await fetch('/api/load_story_from_plaza', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({code: roomCode, nickname, filename: targetFilename})
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('故事加载成功');
+                    closePlazaModal();
+                    fetchCurrentStory();
+                    fetchStoryList && fetchStoryList();
+                } else {
+                    document.getElementById('plaza-select-result').innerHTML = '<div class="error">' + (data.error || '加载失败') + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('plaza-select-result').innerHTML = '<div class="error">网络错误</div>';
+            }
+        };
+    } else {
+        // 刷新下拉选项
+        const select = modal.querySelector('#plaza-story-select');
+        select.innerHTML = stories.map(story => `<option value="${story.filename}">${story.name} ${story.id}</option>`).join('');
+        modal.style.display = 'flex';
+    }
+    modal.style.display = 'flex';
+}
+
+// 修复上传题目按钮
 function setupUploadBtn() {
-    const uploadBtn = document.getElementById('upload-story-btn');
-    const fileInput = document.getElementById('upload-story-input');
-    uploadBtn.onclick = function() {
-        fileInput.click();
+    const storyOps = document.getElementById('story-ops');
+    if (!storyOps) return;
+    storyOps.innerHTML = `
+        <div style="margin-bottom: 12px;">
+            <input type="file" id="story-file" accept=".json" multiple style="display:none;">
+            <button class="btn" id="upload-story-btn">上传题目 (json)</button>
+            <button class="btn" id="load-plaza-btn">从故事广场加载</button>
+            <div style="color: #64748b; font-size: 12px; margin-top: 4px;">文件大小不能超过20MB</div>
+        </div>
+        <div id="story-list" style="margin-bottom: 12px;"></div>
+    `;
+    document.getElementById('upload-story-btn').onclick = function() {
+        document.getElementById('story-file').click();
     };
-    fileInput.onchange = async function() {
-        if (!fileInput.files.length || isUploading) return;
+    document.getElementById('load-plaza-btn').onclick = function() {
+        showPlazaStorySelector();
+    };
+    document.getElementById('story-file').onchange = async function() {
+        if (isUploading) return;
         isUploading = true;
-        uploadBtn.disabled = true;
+        const files = this.files;
+        if (files.length === 0) {
+            isUploading = false;
+            return;
+        }
         const formData = new FormData();
+        for (let file of files) {
+            formData.append('file', file);
+        }
         formData.append('code', roomCode);
         formData.append('nickname', nickname);
-        for (let i = 0; i < fileInput.files.length; i++) {
-            formData.append('file', fileInput.files[i]);
-        }
         try {
             const res = await fetch('/api/upload_story', {
                 method: 'POST',
@@ -319,18 +427,17 @@ function setupUploadBtn() {
             });
             const data = await res.json();
             if (data.success) {
-                await fetchCurrentStory();
-                await fetchStoryList();
-                alert('题目上传成功');
+                alert(`上传成功，共${data.count}个题目`);
+                fetchCurrentStory();
+                fetchStoryList && fetchStoryList();
             } else {
-                alert(data.error || '上传失败');
+                alert('上传失败：' + (data.error || '未知错误'));
             }
         } catch (e) {
-            alert('上传失败');
+            alert('上传失败：网络错误');
         }
-        fileInput.value = '';
         isUploading = false;
-        uploadBtn.disabled = false;
+        this.value = '';
     };
 }
 
@@ -370,24 +477,38 @@ async function setStoryIndex(idx) {
     }
 }
 
+// 获取当前故事信息
+async function fetchCurrentStory() {
+    if (!roomCode) return;
+    try {
+        const res = await fetch('/api/get_current_story', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code: roomCode})
+        });
+        const data = await res.json();
+        if (data.surface !== undefined) {
+            renderStory({surface: data.surface, victory_condition: data.victory_condition, answer: data.answer});
+        } else {
+            renderStory(null);
+        }
+    } catch (e) {
+        renderStory(null);
+    }
+}
+
 // 页面初始化，插入题目上传和切换控件
 (function(){
     const chatPage = document.getElementById('page-chat');
     const storyOps = document.createElement('div');
     storyOps.id = 'story-ops';
     storyOps.style = 'margin-bottom:12px;display:none;text-align:center;';
-    storyOps.innerHTML = `
-        <input type="file" id="upload-story-input" accept=".json" multiple style="display:none">
-        <button class="btn" id="upload-story-btn" style="margin-bottom:8px;">上传题目（json）</button>
-        <select id="story-index-select" style="display:none;margin-left:8px;"></select>
-    `;
     chatPage.insertBefore(storyOps, chatPage.firstChild);
     // 当前题目展示区
     const storyDiv = document.createElement('div');
     storyDiv.id = 'current-story';
     storyDiv.style = 'background:#f1f5f9;border-radius:10px;padding:12px 10px;margin-bottom:12px;min-height:48px;';
     chatPage.insertBefore(storyDiv, storyOps.nextSibling);
-    setupUploadBtn();
 })();
 
 // 保持刷新后页面还在群聊页
