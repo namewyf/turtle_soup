@@ -14,6 +14,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            overflow-x: hidden;
         }
         .container {
             background: #fff;
@@ -112,6 +113,7 @@
                 <h2>AI海龟汤聊天室</h2>
                 <button class="btn" onclick="showPage('create')">创建房间</button>
                 <button class="btn" onclick="showPage('join')">加入房间</button>
+                <button class="btn" onclick="window.open('/story_plaza', '_blank')">故事广场</button>
             </div>
             <!-- 创建房间页 -->
             <div id="page-create" style="display:none;">
@@ -181,6 +183,9 @@
             <div style="font-size:15px;color:#2563eb;font-weight:bold;padding-left:18px;margin-bottom:6px;">在线成员</div>
             <div id="user-list"></div>
         </div>
+    </div>
+    <div style="text-align:center;margin-top:20px;color:#64748b;font-size:12px;">
+        <a href="https://github.com/mumuhaha487/Turtle_Soup" target="_blank" style="color:#3b82f6;text-decoration:none;">Turtle_Soup</a> 由 <a href="https://github.com/mumuhaha487" target="_blank" style="color:#3b82f6;text-decoration:none;">mumuhaha</a> 构建
     </div>
     <script src="/static/main.js"></script>
 </body>

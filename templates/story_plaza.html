@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>故事广场</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            background: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 100%);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+        .container {
+            background: #fff;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            border-radius: 18px;
+            padding: 32px 28px 18px 28px;
+            margin-top: 48px;
+            width: 100%;
+            max-width: 800px;
+        }
+        h2 {
+            text-align: center;
+            color: #3b82f6;
+            font-weight: 700;
+            margin-bottom: 24px;
+            letter-spacing: 2px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #3b82f6 60%, #60a5fa 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0 22px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 2px 8px 0 rgba(59, 130, 246, 0.10);
+            transition: background 0.2s, transform 0.1s;
+            margin: 8px 0;
+            height: 40px;
+        }
+        .btn:active { transform: scale(0.97); }
+        .form-group { margin-bottom: 18px; }
+        label { color: #64748b; font-size: 15px; display: block; margin-bottom: 6px; }
+        input[type=text], input[type=file] {
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-size: 15px;
+            width: 100%;
+            margin-top: 4px;
+            transition: border 0.2s;
+            background: #f8fafc;
+        }
+        input[type=text]:focus, input[type=file]:focus { border: 1.5px solid #3b82f6; outline: none; }
+        .upload-section {
+            background: #f1f5f9;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .error { color: #f87171; margin-top: 8px; }
+        .success { color: #10b981; margin-top: 8px; }
+        .story-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+        }
+        .story-title {
+            font-weight: bold;
+            color: #1e293b;
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+        .story-surface {
+            color: #64748b;
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        .story-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 10px;
+        }
+        .start-btn {
+            background: linear-gradient(135deg, #10b981 60%, #059669 100%);
+        }
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+        .input-row input {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>故事广场</h2>
+        <!-- 上传故事区域 -->
+        <div class="upload-section">
+            <h3 style="color: #3b82f6; margin-bottom: 16px;">上传故事</h3>
+            <form id="upload-form">
+                <div class="form-group">
+                    <label>故事名称</label>
+                    <input type="text" id="story-name" maxlength="32" required placeholder="请输入故事名称">
+                </div>
+                <div class="form-group">
+                    <label>选择JSON文件</label>
+                    <input type="file" id="story-file" accept=".json" required>
+                </div>
+                <button class="btn" type="submit">上传到故事广场</button>
+            </form>
+            <div id="upload-result"></div>
+        </div>
+        <!-- 通过编号快速加载故事 -->
+        <div class="upload-section">
+            <h3 style="color: #3b82f6; margin-bottom: 16px;">通过编号快速加载故事</h3>
+            <div class="input-row">
+                <input type="text" id="load-story-id" maxlength="10" placeholder="请输入故事编号（如 #00001）">
+                <button class="btn" id="load-story-btn">加载</button>
+            </div>
+            <div id="load-story-result"></div>
+        </div>
+        <!-- 故事列表 -->
+        <div id="stories-container">
+            <h3 style="color: #3b82f6; margin-bottom: 16px;">已发布的故事</h3>
+            <div id="stories-list"></div>
+        </div>
+        <button class="btn" onclick="window.location.href='/'" style="margin-bottom:18px;">返回主界面</button>
+    </div>
+    <div style="text-align:center;margin-top:20px;color:#64748b;font-size:12px;">
+        <a href="https://github.com/mumuhaha487/Turtle_Soup" target="_blank" style="color:#3b82f6;text-decoration:none;">Turtle_Soup</a> 由 <a href="https://github.com/mumuhaha487" target="_blank" style="color:#3b82f6;text-decoration:none;">mumuhaha</a> 构建
+    </div>
+    <!-- 一键开始弹窗 -->
+    <div id="start-modal" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:999;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:32px 24px;border-radius:16px;box-shadow:0 8px 32px 0 rgba(31,38,135,0.15);max-width:400px;width:90vw;max-height:80vh;overflow-y:auto;">
+            <h3 style="color:#3b82f6;text-align:center;margin-bottom:18px;">一键开始故事</h3>
+            <form id="start-form">
+                <div class="form-group"><label>昵称</label><input type="text" id="start-nickname" required maxlength="16" style="width:100%;box-sizing:border-box;"></div>
+                <div class="form-group"><label>代理地址</label><input type="text" id="start-base-url" required value="http://api.0ha.top/v1" style="width:100%;box-sizing:border-box;"></div>
+                <div class="form-group"><label>API Key</label><input type="text" id="start-api-key" required style="width:100%;box-sizing:border-box;"></div>
+                <div class="form-group"><label>模型名</label><input type="text" id="start-model" required value="o3-mini-2025-01-31" style="width:100%;box-sizing:border-box;"></div>
+                <input type="hidden" id="start-story-filename">
+                <button class="btn start-btn" type="submit" style="width:100%;margin-top:10px;">立即开始</button>
+                <button class="btn" type="button" onclick="closeStartModal()" style="width:100%;background:#e5e7eb;color:#334155;margin-top:8px;">取消</button>
+            </form>
+            <div id="start-result" style="margin-top:10px;"></div>
+        </div>
+    </div>
+    <script>
+        // 上传故事
+        document.getElementById('upload-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('story-file');
+            const nameInput = document.getElementById('story-name');
+            const resultDiv = document.getElementById('upload-result');
+            if (!fileInput.files[0]) {
+                resultDiv.innerHTML = '<div class="error">请选择文件</div>';
+                return;
+            }
+            if (!nameInput.value.trim()) {
+                resultDiv.innerHTML = '<div class="error">请填写故事名称</div>';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('name', nameInput.value.trim());
+            try {
+                const response = await fetch('/api/upload_to_plaza', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.success) {
+                    resultDiv.innerHTML = '<div class="success">' + data.message + '</div>';
+                    fileInput.value = '';
+                    nameInput.value = '';
+                    loadStories();
+                } else {
+                    resultDiv.innerHTML = '<div class="error">' + (data.error || '上传失败') + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">网络错误</div>';
+            }
+        });
+        // 加载故事列表
+        async function loadStories() {
+            try {
+                const response = await fetch('/api/get_plaza_stories');
+                const data = await response.json();
+                const storiesList = document.getElementById('stories-list');
+                storiesList.innerHTML = '';
+                if (data.stories.length === 0) {
+                    storiesList.innerHTML = '<p style="color: #64748b; text-align: center;">暂无故事</p>';
+                    return;
+                }
+                data.stories.forEach(story => {
+                    const storyCard = document.createElement('div');
+                    storyCard.className = 'story-card';
+                    storyCard.innerHTML = `
+                        <div class="story-title">${story.name || '无名称'} <span style='color:#64748b;font-size:13px;'>${story.id || ''}</span></div>
+                        <div class="story-surface">${story.surface || '无内容'}</div>
+                        <div class="story-actions"><button class="btn start-btn" onclick="openStartModal('${story.filename}')">一键开始</button></div>
+                    `;
+                    storiesList.appendChild(storyCard);
+                });
+            } catch (error) {
+                console.error('加载故事失败:', error);
+            }
+        }
+        // 通过编号加载故事
+        document.getElementById('load-story-btn').onclick = async function() {
+            const id = document.getElementById('load-story-id').value.trim();
+            const resultDiv = document.getElementById('load-story-result');
+            if (!id) {
+                resultDiv.innerHTML = '<div class="error">请输入故事编号</div>';
+                return;
+            }
+            try {
+                const response = await fetch('/api/get_plaza_stories');
+                const data = await response.json();
+                const story = data.stories.find(s => s.id === id);
+                if (!story) {
+                    resultDiv.innerHTML = '<div class="error">未找到该编号的故事</div>';
+                    return;
+                }
+                openStartModal(story.filename);
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">网络错误</div>';
+            }
+        };
+        // 一键开始弹窗逻辑
+        function openStartModal(filename) {
+            document.getElementById('start-modal').style.display = 'flex';
+            document.getElementById('start-story-filename').value = filename;
+            document.getElementById('start-result').innerHTML = '';
+        }
+        function closeStartModal() {
+            document.getElementById('start-modal').style.display = 'none';
+        }
+        document.getElementById('start-form').onsubmit = async function(e) {
+            e.preventDefault();
+            const nickname = document.getElementById('start-nickname').value.trim();
+            const base_url = document.getElementById('start-base-url').value.trim();
+            const api_key = document.getElementById('start-api-key').value.trim();
+            const model = document.getElementById('start-model').value.trim();
+            const filename = document.getElementById('start-story-filename').value;
+            const resultDiv = document.getElementById('start-result');
+            if (!nickname || !base_url || !api_key || !model) {
+                resultDiv.innerHTML = '<div class="error">请填写完整信息</div>';
+                return;
+            }
+            // 创建房间并载入故事
+            try {
+                const res = await fetch('/api/create_room', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({nickname, base_url, api_key, model})
+                });
+                const data = await res.json();
+                if (!data.code) {
+                    resultDiv.innerHTML = '<div class="error">' + (data.error || '创建房间失败') + '</div>';
+                    return;
+                }
+                // 加载故事
+                const res2 = await fetch('/api/load_story_from_plaza', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({code: data.code, nickname, filename})
+                });
+                const data2 = await res2.json();
+                if (!data2.success) {
+                    resultDiv.innerHTML = '<div class="error">' + (data2.error || '加载故事失败') + '</div>';
+                    return;
+                }
+                // 跳转到主界面并自动进入房间
+                localStorage.setItem('haigui_room', JSON.stringify({roomCode: data.code, nickname, isOwner: true}));
+                window.location.href = '/';
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">网络错误</div>';
+            }
+        };
+        // 页面加载时获取故事列表
+        loadStories();
+    </script>
+</body>
+</html> 
