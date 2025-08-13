@@ -5,6 +5,7 @@ import random, string, threading, json, time
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import uuid
+import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -17,12 +18,32 @@ PRESET = config.get('preset', None)
 ADMIN_USERNAME = config.get('admin', {}).get('username', 'admin')
 ADMIN_PASSWORD = config.get('admin', {}).get('password', 'admin123')
 STORY_COUNTER = config.get('story_counter', 1)
+OPTIONS = config.get('options', {
+    'models': ['gpt-5-chat-2025-08-07', 'o3-mini-2025-01-31'],
+    'base_urls': ['http://api.0ha.top/v1'],
+    'api_keys': []
+})
+ANNOUNCEMENTS = config.get('announcements', '')
 
 # 保存config.json计数
 def save_story_counter(counter):
     with open('config.json', 'r', encoding='utf-8') as f:
         config = json.load(f)
     config['story_counter'] = counter
+    with open('config.json', 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+def save_options(options):
+    with open('config.json', 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    config['options'] = options
+    with open('config.json', 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+def save_announcements(content):
+    with open('config.json', 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    config['announcements'] = content
     with open('config.json', 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
@@ -457,6 +478,64 @@ def upload_to_plaza():
     except Exception as e:
         return jsonify({'error': f'文件解析失败: {str(e)}'}), 400
 
+@app.route('/api/submit_story_online', methods=['POST'])
+def submit_story_online():
+    """在线编辑并提交故事到广场（待审核）"""
+    try:
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+            name = data.get('name', '').strip()
+            surface = data.get('surface', '').strip()
+            answer = data.get('answer', '').strip()
+            additional = data.get('additional', '').strip()
+            victory_condition = data.get('victory_condition', '').strip()
+        else:
+            name = (request.form.get('name') or '').strip()
+            surface = (request.form.get('surface') or '').strip()
+            answer = (request.form.get('answer') or '').strip()
+            additional = (request.form.get('additional') or '').strip()
+            victory_condition = (request.form.get('victory_condition') or '').strip()
+
+        if not name:
+            return jsonify({'error': '请填写故事名称'}), 400
+        if not surface:
+            return jsonify({'error': '请填写汤面'}), 400
+        if not answer:
+            return jsonify({'error': '请填写汤底'}), 400
+        if not victory_condition:
+            return jsonify({'error': '请填写获胜条件'}), 400
+
+        # 生成唯一编号
+        global STORY_COUNTER
+        story_id = f"#{STORY_COUNTER:05d}"
+        STORY_COUNTER += 1
+        save_story_counter(STORY_COUNTER)
+
+        # 故事数据
+        story_data = {
+            'surface': surface,
+            'answer': answer,
+            'additional': additional,
+            'victory_condition': victory_condition
+        }
+
+        plaza_story = {
+            'name': name,
+            'id': story_id,
+            'surface': surface,
+            'data': story_data
+        }
+
+        # 保存到待发布目录
+        filename = f"{uuid.uuid4()}.json"
+        filepath = os.path.join(STORY_UPLOAD_DIR, filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(plaza_story, f, ensure_ascii=False, indent=2)
+
+        return jsonify({'success': True, 'message': '故事已提交，等待管理员审核', 'id': story_id})
+    except Exception as e:
+        return jsonify({'error': f'提交失败: {str(e)}'}), 500
+
 @app.route('/api/get_plaza_stories', methods=['GET'])
 def get_plaza_stories():
     """获取故事广场列表"""
@@ -498,6 +577,23 @@ def get_pending_stories():
             except Exception as e:
                 print(f"Error reading {filename}: {e}")
     return jsonify({'stories': stories})
+
+@app.route('/api/delete_released_story', methods=['POST'])
+def delete_released_story():
+    """删除已发布的故事（管理员）"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': '未登录'}), 403
+    filename = request.form.get('filename')
+    if not filename:
+        return jsonify({'error': '参数不完整'}), 400
+    filepath = os.path.join(STORY_RELEASE_DIR, filename)
+    if not os.path.exists(filepath):
+        return jsonify({'error': '文件不存在'}), 404
+    try:
+        os.remove(filepath)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': f'操作失败: {str(e)}'}), 500
 
 @app.route('/api/approve_story', methods=['POST'])
 def approve_story():
@@ -603,5 +699,75 @@ def admin_delete_room():
         else:
             return jsonify({'error': '房间不存在'}), 404
 
+@app.route('/api/get_options', methods=['GET'])
+def get_options():
+    """获取下拉选项（模型、代理地址、API Key）"""
+    return jsonify({'options': OPTIONS})
+
+@app.route('/api/save_options', methods=['POST'])
+def save_options_endpoint():
+    """保存下拉选项（管理员）"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': '未登录'}), 403
+    data = request.get_json(silent=True) or {}
+    models = data.get('models', [])
+    base_urls = data.get('base_urls', [])
+    api_keys = data.get('api_keys', [])
+    if not isinstance(models, list) or not isinstance(base_urls, list) or not isinstance(api_keys, list):
+        return jsonify({'error': '参数格式错误'}), 400
+    # 规范化为字符串并去重/去空
+    def normalize(lst):
+        result = []
+        for x in lst:
+            s = str(x).strip()
+            if s and s not in result:
+                result.append(s)
+        return result
+    new_options = {
+        'models': normalize(models),
+        'base_urls': normalize(base_urls),
+        'api_keys': normalize(api_keys)
+    }
+    global OPTIONS
+    OPTIONS = new_options
+    save_options(OPTIONS)
+    return jsonify({'success': True})
+
+@app.route('/api/get_announcements', methods=['GET'])
+def get_announcements():
+    """获取公告"""
+    return jsonify({'content': ANNOUNCEMENTS or ''})
+
+@app.route('/api/save_announcements', methods=['POST'])
+def update_announcements():
+    """保存公告（管理员）"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': '未登录'}), 403
+    data = request.get_json(silent=True) or {}
+    content = str(data.get('content', ''))
+    global ANNOUNCEMENTS
+    ANNOUNCEMENTS = content
+    save_announcements(ANNOUNCEMENTS)
+    return jsonify({'success': True})
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True) 
+    # 每天凌晨3点清空所有房间
+    def daily_cleanup_task():
+        while True:
+            now = datetime.datetime.now()
+            # 计算下一次凌晨3点
+            next_run = (now + datetime.timedelta(days=1)).replace(hour=3, minute=0, second=0, microsecond=0)
+            # 若当前已过3点，则从明天的3点开始
+            if now.hour < 3:
+                next_run = now.replace(hour=3, minute=0, second=0, microsecond=0)
+            sleep_seconds = (next_run - now).total_seconds()
+            time.sleep(max(1, int(sleep_seconds)))
+            try:
+                with rooms_lock:
+                    rooms.clear()
+                print('[定时任务] 已在凌晨3点清空所有房间')
+            except Exception as e:
+                print(f'[定时任务] 清理失败: {e}')
+
+    threading.Thread(target=daily_cleanup_task, daemon=True).start()
+    app.run(host='0.0.0.0', port=5000, debug=True)
