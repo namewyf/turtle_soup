@@ -29,9 +29,16 @@ let joinBtn;
 createBtn = document.getElementById('create-room-btn');
 createBtn.onclick = async function() {
     const nick = document.getElementById('create-nickname').value.trim();
-    const base_url = document.getElementById('create-base-url').value.trim();
-    const api_key = document.getElementById('create-api-key').value.trim();
-    const model = document.getElementById('create-model').value.trim();
+    // 读取下拉或自定义
+    const baseUrlSelect = document.getElementById('create-base-url-select');
+    const apiKeySelect = document.getElementById('create-api-key-select');
+    const modelSelect = document.getElementById('create-model-select');
+    const base_url_custom = document.getElementById('create-base-url').value.trim();
+    const api_key_custom = document.getElementById('create-api-key').value.trim();
+    const model_custom = document.getElementById('create-model').value.trim();
+    const base_url = base_url_custom || (baseUrlSelect && baseUrlSelect.value) || '';
+    const api_key = api_key_custom || (apiKeySelect && apiKeySelect.value) || '';
+    const model = model_custom || (modelSelect && modelSelect.value) || '';
     if (!nick || !base_url || !api_key || !model) {
         document.getElementById('create-error').textContent = '请填写完整信息';
         return;
@@ -541,6 +548,90 @@ leaveRoomBtn = document.querySelector('button[onclick="leaveRoom()"]');
 if (leaveRoomBtn) {
     leaveRoomBtn.onclick = function() { leaveRoom(); };
 }
+
+// 公告侧栏渲染
+(async function renderAnnouncements(){
+    try {
+        const resp = await fetch('/api/get_announcements');
+        const data = await resp.json();
+        const content = (data && data.content) ? data.content : '';
+        // 在左侧创建公告栏
+        let left = document.getElementById('announcement-panel');
+        if (!left) {
+            left = document.createElement('div');
+            left.id = 'announcement-panel';
+            left.style.background = '#f1f5f9';
+            left.style.borderRadius = '12px';
+            left.style.padding = '10px 12px 10px 12px';
+            left.style.marginTop = '48px';
+            left.style.maxWidth = '320px';
+            left.style.minWidth = '220px';
+            left.style.boxShadow = '0 2px 8px 0 rgba(59,130,246,0.08)';
+            left.style.marginRight = '16px';
+            // 将公告栏插入到主布局最左侧
+            const layout = document.querySelector('.main-layout');
+            if (layout) layout.insertBefore(left, layout.firstChild);
+        }
+        left.innerHTML = '<div style="font-size:15px;color:#2563eb;font-weight:bold;margin-bottom:6px;">公告</div>' +
+            '<div style="white-space:pre-wrap;color:#334155;line-height:1.6;">' + (content ? escapeHtml(content) : '暂无公告') + '</div>';
+    } catch (e) {}
+})();
+
+// 初始化创建房间下拉选项
+(function ensureCreateDropdowns(){
+    // 兼容旧模板：如果没有下拉，动态创建
+    const makeGroup = (inputId, selectId, labelText) => {
+        const input = document.getElementById(inputId);
+        if (!input || document.getElementById(selectId)) return; // 已存在或找不到输入框
+        const parent = input.parentElement;
+        // 创建容器
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'flex';
+        wrapper.style.gap = '8px';
+        // 创建select
+        const select = document.createElement('select');
+        select.id = selectId;
+        select.style.flex = '1';
+        select.style.border = '1.5px solid #cbd5e1';
+        select.style.borderRadius = '8px';
+        select.style.padding = '8px';
+        select.style.background = '#f8fafc';
+        // 插入
+        parent.insertBefore(wrapper, input);
+        wrapper.appendChild(select);
+        wrapper.appendChild(input);
+        input.style.flex = '1';
+    };
+    makeGroup('create-base-url', 'create-base-url-select');
+    makeGroup('create-api-key', 'create-api-key-select');
+    makeGroup('create-model', 'create-model-select');
+})();
+
+(async function initCreateOptions(){
+    try {
+        const resp = await fetch('/api/get_options');
+        const data = await resp.json();
+        const opt = data.options || {models:[], base_urls:[], api_keys:[]};
+        const fill = (id, list)=>{
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = '';
+            const def = document.createElement('option');
+            def.value = '';
+            def.textContent = '请选择';
+            el.appendChild(def);
+            list.forEach(v=>{
+                const o = document.createElement('option');
+                o.value = v; o.textContent = v; el.appendChild(o);
+            });
+            // 默认选中第一个可用项
+            if (list && list.length) el.value = list[0];
+        };
+        fill('create-base-url-select', opt.base_urls || []);
+        fill('create-api-key-select', opt.api_keys || []);
+        fill('create-model-select', opt.models || ['gpt-5-chat-2025-08-07']);
+    } catch (e) {}
+})();
 
 function renderChatMessages(msgs) {
     const box = document.getElementById('chat-box-chat');
