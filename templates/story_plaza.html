@@ -179,9 +179,24 @@
             <h3 style="color:#3b82f6;text-align:center;margin-bottom:18px;">一键开始故事</h3>
             <form id="start-form">
                 <div class="form-group"><label>昵称</label><input type="text" id="start-nickname" required maxlength="16" style="width:100%;box-sizing:border-box;"></div>
-                <div class="form-group"><label>代理地址</label><input type="text" id="start-base-url" required value="http://api.0ha.top/v1" style="width:100%;box-sizing:border-box;"></div>
-                <div class="form-group"><label>API Key</label><input type="text" id="start-api-key" required style="width:100%;box-sizing:border-box;"></div>
-                <div class="form-group"><label>模型名</label><input type="text" id="start-model" required value="gpt-5-chat-2025-08-07" style="width:100%;box-sizing:border-box;"></div>
+                <div class="form-group"><label>代理地址</label>
+                    <div style="display:flex;gap:8px;">
+                        <select id="start-base-url-select" style="flex:1;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;background:#f8fafc;"></select>
+                        <input type="text" id="start-base-url" placeholder="自定义代理地址（可选）" style="flex:1;">
+                    </div>
+                </div>
+                <div class="form-group"><label>API Key</label>
+                    <div style="display:flex;gap:8px;">
+                        <select id="start-api-key-select" style="flex:1;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;background:#f8fafc;"></select>
+                        <input type="text" id="start-api-key" placeholder="自定义API Key（可选）" style="flex:1;">
+                    </div>
+                </div>
+                <div class="form-group"><label>模型名</label>
+                    <div style="display:flex;gap:8px;">
+                        <select id="start-model-select" style="flex:1;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;background:#f8fafc;"></select>
+                        <input type="text" id="start-model" placeholder="自定义模型名（可选）" style="flex:1;">
+                    </div>
+                </div>
                 <input type="hidden" id="start-story-filename">
                 <button class="btn start-btn" type="submit" style="width:100%;margin-top:10px;">立即开始</button>
                 <button class="btn" type="button" onclick="closeStartModal()" style="width:100%;background:#e5e7eb;color:#334155;margin-top:8px;">取消</button>
@@ -315,9 +330,12 @@
         document.getElementById('start-form').onsubmit = async function(e) {
             e.preventDefault();
             const nickname = document.getElementById('start-nickname').value.trim();
-            const base_url = document.getElementById('start-base-url').value.trim();
-            const api_key = document.getElementById('start-api-key').value.trim();
-            const model = document.getElementById('start-model').value.trim();
+            const base_url_custom = document.getElementById('start-base-url').value.trim();
+            const api_key_custom = document.getElementById('start-api-key').value.trim();
+            const model_custom = document.getElementById('start-model').value.trim();
+            const base_url = base_url_custom || (document.getElementById('start-base-url-select').value || '');
+            const api_key = api_key_custom || (document.getElementById('start-api-key-select').value || '');
+            const model = model_custom || (document.getElementById('start-model-select').value || '');
             const filename = document.getElementById('start-story-filename').value;
             const resultDiv = document.getElementById('start-result');
             if (!nickname || !base_url || !api_key || !model) {
@@ -354,8 +372,35 @@
                 resultDiv.innerHTML = '<div class="error">网络错误</div>';
             }
         };
-        // 页面加载时获取故事列表
+        // 填充选择项
+        async function initPlazaOptions() {
+            try {
+                const resp = await fetch('/api/get_options');
+                const data = await resp.json();
+                const opt = data.options || {models:[], base_urls:[], api_keys:[]};
+                const fill = (id, list)=>{
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.innerHTML = '';
+                    const def = document.createElement('option');
+                    def.value = '';
+                    def.textContent = '请选择';
+                    el.appendChild(def);
+                    (list||[]).forEach(v=>{
+                        const o = document.createElement('option');
+                        o.value = v; o.textContent = v; el.appendChild(o);
+                    });
+                    if (list && list.length) el.value = list[0];
+                };
+                fill('start-base-url-select', opt.base_urls || []);
+                fill('start-api-key-select', opt.api_keys || []);
+                fill('start-model-select', opt.models || ['gpt-5-chat-2025-08-07']);
+            } catch (e) {}
+        }
+
+        // 页面加载时获取故事列表与初始化选项
         loadStories();
+        initPlazaOptions();
     </script>
 </body>
 </html> 
