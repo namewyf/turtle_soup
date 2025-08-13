@@ -130,13 +130,53 @@
         <!-- 已发布的故事 -->
         <div class="section">
             <h3 style="color: #3b82f6; margin-bottom: 16px;">已发布的故事</h3>
-            <table id="released-stories-table">
-                <tr>
-                    <th>故事名称</th>
-                    <th>编号</th>
-                    <th>文件名</th>
-                </tr>
-            </table>
+            <div class="input-row" style="display:flex;gap:10px;margin-bottom:10px;align-items:center;">
+                <input type="text" id="released-search" placeholder="搜索名称/编号/文件名" style="flex:1;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px 10px;background:#f8fafc;font-size:14px;">
+                <button class="btn" id="released-refresh">刷新</button>
+            </div>
+            <div id="released-wrapper" style="max-height:420px;overflow-y:auto;border-radius:12px;background:#f8fafc;box-shadow:0 2px 8px 0 rgba(59,130,246,0.05);">
+                <table id="released-stories-table" style="margin:0;">
+                    <tr>
+                        <th>故事名称</th>
+                        <th>编号</th>
+                        <th>文件名</th>
+                        <th>操作</th>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- 选项管理 -->
+        <div class="section">
+            <h3 style="color: #3b82f6; margin-bottom: 16px;">创建房间下拉选项管理</h3>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:260px;">
+                    <div style="font-weight:bold;color:#334155;margin-bottom:6px;">模型列表</div>
+                    <textarea id="opt-models" style="width:100%;height:120px;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;" placeholder="每行一个模型名"></textarea>
+                </div>
+                <div style="flex:1;min-width:260px;">
+                    <div style="font-weight:bold;color:#334155;margin-bottom:6px;">代理地址列表</div>
+                    <textarea id="opt-base-urls" style="width:100%;height:120px;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;" placeholder="每行一个代理地址"></textarea>
+                </div>
+                <div style="flex:1;min-width:260px;">
+                    <div style="font-weight:bold;color:#334155;margin-bottom:6px;">API Key 列表</div>
+                    <textarea id="opt-api-keys" style="width:100%;height:120px;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;" placeholder="每行一个API Key（可选）"></textarea>
+                </div>
+            </div>
+            <div style="margin-top:10px;">
+                <button class="btn" onclick="saveOptions()">保存选项</button>
+                <span id="opt-result" style="margin-left:8px;color:#64748b;"></span>
+            </div>
+        </div>
+
+        <!-- 公告管理 -->
+        <div class="section">
+            <h3 style="color: #3b82f6; margin-bottom: 16px;">首页公告</h3>
+            <textarea id="ann-content" style="width:100%;height:160px;border:1.5px solid #cbd5e1;border-radius:8px;padding:10px;" placeholder="在此输入公告内容，支持换行"></textarea>
+            <div style="margin-top:10px;">
+                <button class="btn" onclick="saveAnnouncements()">保存公告</button>
+                <span id="ann-result" style="margin-left:8px;color:#64748b;"></span>
+            </div>
         </div>
     </div>
     <script>
@@ -247,31 +287,35 @@
         }
 
         // 加载已发布的故事
+        let releasedCache = [];
         async function loadReleasedStories() {
             try {
                 const response = await fetch('/api/get_plaza_stories');
                 const data = await response.json();
+                releasedCache = data.stories || [];
                 const table = document.getElementById('released-stories-table');
                 // 清除现有行（保留表头）
                 const rows = table.querySelectorAll('tr');
                 for (let i = 1; i < rows.length; i++) {
                     rows[i].remove();
                 }
-                if (data.stories.length === 0) {
+                const list = releasedCache;
+                if (list.length === 0) {
                     const row = table.insertRow();
                     const cell = row.insertCell();
-                    cell.colSpan = 3;
+                    cell.colSpan = 4;
                     cell.textContent = '暂无已发布故事';
                     cell.style.textAlign = 'center';
                     cell.style.color = '#64748b';
                     return;
                 }
-                data.stories.forEach(story => {
+                list.forEach(story => {
                     const row = table.insertRow();
                     row.innerHTML = `
                         <td>${story.name || '无名称'}</td>
                         <td>${story.id || ''}</td>
                         <td>${story.filename || ''}</td>
+                        <td><button class="btn btn-reject" onclick="deleteReleased('${story.filename}')">删除</button></td>
                     `;
                 });
             } catch (error) {
@@ -279,9 +323,131 @@
             }
         }
 
+        function renderReleasedFiltered(keyword) {
+            const table = document.getElementById('released-stories-table');
+            const rows = table.querySelectorAll('tr');
+            for (let i = 1; i < rows.length; i++) rows[i].remove();
+            const list = releasedCache.filter(s => {
+                if (!keyword) return true;
+                const k = keyword.toLowerCase();
+                return (s.name||'').toLowerCase().includes(k) || (s.id||'').toLowerCase().includes(k) || (s.filename||'').toLowerCase().includes(k);
+            });
+            if (list.length === 0) {
+                const row = table.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 4;
+                cell.textContent = '无匹配结果';
+                cell.style.textAlign = 'center';
+                cell.style.color = '#64748b';
+                return;
+            }
+            list.forEach(story => {
+                const row = table.insertRow();
+                row.innerHTML = `
+                    <td>${story.name || '无名称'}</td>
+                    <td>${story.id || ''}</td>
+                    <td>${story.filename || ''}</td>
+                    <td><button class="btn btn-reject" onclick="deleteReleased('${story.filename}')">删除</button></td>
+                `;
+            });
+        }
+
+        // 绑定搜索与刷新
+        (function bindReleasedSearch(){
+            const input = document.getElementById('released-search');
+            const btn = document.getElementById('released-refresh');
+            if (input) {
+                input.addEventListener('input', function(){
+                    renderReleasedFiltered(this.value.trim());
+                });
+            }
+            if (btn) {
+                btn.addEventListener('click', async function(){
+                    await loadReleasedStories();
+                    renderReleasedFiltered(document.getElementById('released-search').value.trim());
+                });
+            }
+        })();
+
+        function deleteReleased(filename) {
+            if (!confirm('确定要删除该已发布的故事吗？')) return;
+            const formData = new FormData();
+            formData.append('filename', filename);
+            fetch('/api/delete_released_story', {
+                method: 'POST',
+                body: formData
+            }).then(r => r.json()).then(d => {
+                if (d.success) {
+                    alert('删除成功');
+                    loadReleasedStories().then(()=>{
+                        const kw = (document.getElementById('released-search')||{}).value||'';
+                        renderReleasedFiltered(kw.trim());
+                    });
+                } else {
+                    alert('删除失败：' + (d.error || '未知错误'));
+                }
+            }).catch(() => alert('删除失败：网络错误'));
+        }
+
+        // 选项管理
+        async function loadOptions() {
+            try {
+                const resp = await fetch('/api/get_options');
+                const data = await resp.json();
+                const opt = data.options || {models:[], base_urls:[], api_keys:[]};
+                document.getElementById('opt-models').value = (opt.models || []).join('\n');
+                document.getElementById('opt-base-urls').value = (opt.base_urls || []).join('\n');
+                document.getElementById('opt-api-keys').value = (opt.api_keys || []).join('\n');
+            } catch (e) {}
+        }
+        async function saveOptions() {
+            const toList = (s)=> s.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+            const models = toList(document.getElementById('opt-models').value);
+            const base_urls = toList(document.getElementById('opt-base-urls').value);
+            const api_keys = toList(document.getElementById('opt-api-keys').value);
+            try {
+                const resp = await fetch('/api/save_options', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({models, base_urls, api_keys})
+                });
+                const data = await resp.json();
+                document.getElementById('opt-result').textContent = data.success ? '保存成功' : (data.error || '保存失败');
+            } catch (e) {
+                document.getElementById('opt-result').textContent = '保存失败（网络错误）';
+            }
+        }
+
+        // 公告管理
+        async function loadAnnouncements() {
+            try {
+                const resp = await fetch('/api/get_announcements');
+                const data = await resp.json();
+                document.getElementById('ann-content').value = data.content || '';
+            } catch (e) {}
+        }
+        async function saveAnnouncements() {
+            try {
+                const content = document.getElementById('ann-content').value;
+                const resp = await fetch('/api/save_announcements', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({content})
+                });
+                const data = await resp.json();
+                document.getElementById('ann-result').textContent = data.success ? '保存成功' : (data.error || '保存失败');
+            } catch (e) {
+                document.getElementById('ann-result').textContent = '保存失败（网络错误）';
+            }
+        }
+
         // 页面加载时获取待审核和已发布故事
         loadPendingStories();
-        loadReleasedStories();
+        loadReleasedStories().then(()=>{
+            renderReleasedFiltered('');
+        });
+        loadOptions();
+        loadAnnouncements();
     </script>
     <div style="text-align:center;margin-top:20px;color:#64748b;font-size:12px;">
         <a href="https://github.com/mumuhaha487/Turtle_Soup" target="_blank" style="color:#3b82f6;text-decoration:none;">Turtle_Soup</a> 由 <a href="https://github.com/mumuhaha487" target="_blank" style="color:#3b82f6;text-decoration:none;">mumuhaha</a> 构建

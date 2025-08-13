@@ -126,6 +126,34 @@
             </form>
             <div id="upload-result"></div>
         </div>
+        <!-- 在线编辑并提交审核 -->
+        <div class="upload-section">
+            <h3 style="color: #3b82f6; margin-bottom: 16px;">在线编辑并提交审核</h3>
+            <form id="online-form">
+                <div class="form-group">
+                    <label>故事名称</label>
+                    <input type="text" id="online-name" maxlength="32" placeholder="请输入故事名称" required>
+                </div>
+                <div class="form-group">
+                    <label>汤面</label>
+                    <input type="text" id="online-surface" placeholder="请输入汤面" required>
+                </div>
+                <div class="form-group">
+                    <label>汤底（答案）</label>
+                    <input type="text" id="online-answer" placeholder="请输入汤底" required>
+                </div>
+                <div class="form-group">
+                    <label>补充说明（仅供AI参考）</label>
+                    <input type="text" id="online-additional" placeholder="可选：给AI的补充说明">
+                </div>
+                <div class="form-group">
+                    <label>获胜条件</label>
+                    <input type="text" id="online-victory" placeholder="例如：猜出某个关键事实" required>
+                </div>
+                <button class="btn" type="submit">提交审核</button>
+            </form>
+            <div id="online-result"></div>
+        </div>
         <!-- 通过编号快速加载故事 -->
         <div class="upload-section">
             <h3 style="color: #3b82f6; margin-bottom: 16px;">通过编号快速加载故事</h3>
@@ -153,7 +181,7 @@
                 <div class="form-group"><label>昵称</label><input type="text" id="start-nickname" required maxlength="16" style="width:100%;box-sizing:border-box;"></div>
                 <div class="form-group"><label>代理地址</label><input type="text" id="start-base-url" required value="http://api.0ha.top/v1" style="width:100%;box-sizing:border-box;"></div>
                 <div class="form-group"><label>API Key</label><input type="text" id="start-api-key" required style="width:100%;box-sizing:border-box;"></div>
-                <div class="form-group"><label>模型名</label><input type="text" id="start-model" required value="o3-mini-2025-01-31" style="width:100%;box-sizing:border-box;"></div>
+                <div class="form-group"><label>模型名</label><input type="text" id="start-model" required value="gpt-5-chat-2025-08-07" style="width:100%;box-sizing:border-box;"></div>
                 <input type="hidden" id="start-story-filename">
                 <button class="btn start-btn" type="submit" style="width:100%;margin-top:10px;">立即开始</button>
                 <button class="btn" type="button" onclick="closeStartModal()" style="width:100%;background:#e5e7eb;color:#334155;margin-top:8px;">取消</button>
@@ -197,6 +225,38 @@
                 resultDiv.innerHTML = '<div class="error">网络错误</div>';
             }
         });
+        // 在线编辑提交
+        document.getElementById('online-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const name = document.getElementById('online-name').value.trim();
+            const surface = document.getElementById('online-surface').value.trim();
+            const answer = document.getElementById('online-answer').value.trim();
+            const additional = document.getElementById('online-additional').value.trim();
+            const victory_condition = document.getElementById('online-victory').value.trim();
+            const resultDiv = document.getElementById('online-result');
+            if (!name) { resultDiv.innerHTML = '<div class="error">请填写故事名称</div>'; return; }
+            if (!surface) { resultDiv.innerHTML = '<div class="error">请填写汤面</div>'; return; }
+            if (!answer) { resultDiv.innerHTML = '<div class="error">请填写汤底</div>'; return; }
+            if (!victory_condition) { resultDiv.innerHTML = '<div class="error">请填写获胜条件</div>'; return; }
+            try {
+                const resp = await fetch('/api/submit_story_online', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, surface, answer, additional, victory_condition })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    resultDiv.innerHTML = '<div class="success">' + data.message + '（编号：' + (data.id || '') + '）</div>';
+                    document.getElementById('online-form').reset();
+                    loadStories();
+                } else {
+                    resultDiv.innerHTML = '<div class="error">' + (data.error || '提交失败') + '</div>';
+                }
+            } catch (err) {
+                resultDiv.innerHTML = '<div class="error">网络错误</div>';
+            }
+        });
+
         // 加载故事列表
         async function loadStories() {
             try {

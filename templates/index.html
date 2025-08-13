@@ -107,7 +107,7 @@
 </head>
 <body>
     <div class="main-layout" style="display:flex;flex-direction:row;justify-content:center;align-items:flex-start;width:100vw;min-height:100vh;background:linear-gradient(135deg,#e0e7ff 0%,#f8fafc 100%);">
-        <div class="container" style="flex:1;max-width:600px;margin-right:32px;">
+            <div class="container" style="flex:1;max-width:600px;margin-right:32px;">
             <!-- 首页 -->
             <div id="page-home">
                 <h2>AI海龟汤聊天室</h2>
@@ -124,15 +124,24 @@
                 </div>
                 <div class="form-group">
                     <label>代理地址</label>
-                    <input type="text" id="create-base-url" value="http://api.0ha.top/v1">
+                    <div style="display:flex;gap:8px;">
+                        <select id="create-base-url-select" style="flex:1;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;background:#f8fafc;"></select>
+                        <input type="text" id="create-base-url" placeholder="自定义代理地址（可选）" style="flex:1;">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>API Key</label>
-                    <input type="text" id="create-api-key" placeholder="请输入API Key">
+                    <div style="display:flex;gap:8px;">
+                        <select id="create-api-key-select" style="flex:1;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;background:#f8fafc;"></select>
+                        <input type="text" id="create-api-key" placeholder="自定义API Key（可选）" style="flex:1;">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>模型名</label>
-                    <input type="text" id="create-model" value="o3-mini-2025-01-31">
+                    <div style="display:flex;gap:8px;">
+                        <select id="create-model-select" style="flex:1;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;background:#f8fafc;"></select>
+                        <input type="text" id="create-model" placeholder="自定义模型名（可选）" style="flex:1;">
+                    </div>
                 </div>
                 <button class="btn" id="create-room-btn">创建并进入房间</button>
                 <button class="btn" onclick="showPage('home')">返回首页</button>
@@ -185,7 +194,7 @@
         </div>
     </div>
     <div style="text-align:center;margin-top:20px;color:#64748b;font-size:12px;">
-        <a href="https://github.com/mumuhaha487/Turtle_Soup" target="_blank" style="color:#3b82f6;text-decoration:none;">Turtle_Soup</a> 由 <a href="https://github.com/mumuhaha487" target="_blank" style="color:#3b82f6;text-decoration:none;">mumuhaha</a> 构建
+        <a href="https://github.com/mumuhaha487/Turtle_Soup" target="_blank" style="color:#3b82f6;text-decoration:none;">Turtle_Soup</a> 由 <a href="https://github.com/mumuhaha487" target="_blank" style="color:#3b82f6;text-decoration:none;">mumuhaha</a> 构建 | <a href="https://beian.miit.gov.cn/" target="_blank" style="color:#3b82f6;text-decoration:none;">赣ICP备2024038464号</a>
     </div>
     <script src="/static/main.js"></script>
 </body>
