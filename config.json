@@ -1,20 +1,20 @@
 {
-  "preset": "",
-  "admin": {
-    "username": "",
-    "password": ""
+  "ai_settings": {
+    "base_url": "http://api.0ha.top/v1",
+    "api_key": "sk-gmQZM42fY9vraXVeC9047984D8B240C38082EeEdD284A08d",
+    "model": "gpt-4o-mini",
+    "timeout": 30,
+    "max_retries": 3
   },
-  "story_counter": 7,
-  "options": {
-    "models": [
-      ""
-    ],
-    "base_urls": [
-      ""
-    ],
-    "api_keys": [
-      ""
-    ]
+  "game_settings": {
+    "session_timeout": 3600,
+    "max_hints": 3,
+    "min_questions": 5,
+    "save_interval": 300
   },
-  "announcements": ""
+  "data_settings": {
+    "problems_file": "data/chemistry_problems.json",
+    "categories_file": "data/categories.json",
+    "user_data_file": "data/user_data.json"
+  }
 }
