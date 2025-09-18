@@ -33,102 +33,67 @@ categories = {}
 # 加载化学题库
 def load_chemistry_problems():
     global chemistry_problems, categories
-    try:
-        with open('data/chemistry_problems.json', 'r', encoding='utf-8') as f:
-            chemistry_problems = json.load(f)
-        with open('data/categories.json', 'r', encoding='utf-8') as f:
-            categories = json.load(f)
-        print(f"已加载 {len(chemistry_problems)} 个化学题目")
-    except FileNotFoundError:
-        print("警告: 化学题库文件不存在，将使用内置题库")
-        load_builtin_problems()
-
-# 内置化学题库
-def load_builtin_problems():
-    global chemistry_problems, categories
-    chemistry_problems = [
-        {
-            "id": "chem_001",
-            "title": "蓝瓶子实验",
-            "surface": "一位学生将两种无色溶液混合，溶液突然变成了鲜艳的蓝色，但几分钟后又变回无色。这是为什么？",
-            "answer": "这是经典的蓝瓶子实验。学生混合的是含有亚甲基蓝指示剂的碱性葡萄糖溶液和空气（氧气）。葡萄糖作为还原剂使亚甲基蓝褪色为无色，振荡时氧气氧化亚甲基蓝又变回蓝色。这是一个氧化还原反应的可逆过程。",
-            "victory_condition": "玩家需要识别出这是亚甲基蓝的氧化还原反应，理解葡萄糖的还原作用和氧气的氧化作用，以及颜色的可逆变化原理。",
-            "hints": [
-                "提示1：这涉及到氧化还原反应",
-                "提示2：亚甲基蓝是一种常用的氧化还原指示剂",
-                "提示3：葡萄糖在这个反应中充当还原剂",
-                "提示4：振荡过程中氧气参与反应"
-            ],
-            "difficulty": 2,
-            "category": "氧化还原反应",
-            "subcategory": "指示剂反应",
-            "keywords": ["亚甲基蓝", "氧化还原", "葡萄糖", "氧气", "指示剂"],
-            "related_concepts": ["氧化还原反应", "化学指示剂", "反应动力学"],
-            "time_limit": 600,
-            "success_rate": 0.75,
-            "play_count": 100
-        },
-        {
-            "id": "chem_002",
-            "title": "神秘的银镜",
-            "surface": "一位化学家在试管中加入一种无色溶液，然后加入另一种液体，轻轻摇晃后，试管内壁竟然出现了一层明亮的银镜。这是怎么回事？",
-            "answer": "这是银镜反应。化学家在硝酸银溶液中加入了氨水形成银氨络离子，然后加入葡萄糖或甲醛等还原剂。还原剂将银离子还原为单质银，沉积在试管内壁形成银镜。这是一个典型的氧化还原反应，用于检测醛基的存在。",
-            "victory_condition": "玩家需要识别出银镜反应，理解银氨络离子的形成以及还原剂将银离子还原为银单质的过程。",
-            "hints": [
-                "提示1：这是一种用于检测醛基的经典反应",
-                "提示2：反应涉及到银离子的还原",
-                "提示3：需要先形成银氨络离子",
-                "提示4：葡萄糖或甲醛可以作为还原剂"
-            ],
-            "difficulty": 3,
-            "category": "氧化还原反应",
-            "subcategory": "银镜反应",
-            "keywords": ["银镜反应", "银离子", "还原剂", "醛基", "银氨络离子"],
-            "related_concepts": ["氧化还原反应", "定性分析", "有机化学检测"],
-            "time_limit": 480,
-            "success_rate": 0.65,
-            "play_count": 85
-        },
-        {
-            "id": "chem_003",
-            "title": "变色魔术师",
-            "surface": "实验桌上放着三瓶无色溶液：A、B、C。学生将A倒入B中，溶液变为红色；再将混合液倒入C中，红色立即消失，变为无色。这三种溶液分别是什么？",
-            "answer": "这是酸碱指示剂反应。A是酚酞溶液（无色），B是氢氧化钠溶液（碱性），C是盐酸溶液（酸性）。酚酞在碱性环境中变为红色，在酸性环境中无色。当酚酞遇到氢氧化钠时显红色，再加入盐酸中和碱性后，酚酞恢复无色。",
-            "victory_condition": "玩家需要识别出酚酞作为酸碱指示剂的性质，以及碱性环境下显红色、酸性环境下无色的特性。",
-            "hints": [
-                "提示1：这涉及到酸碱指示剂的性质",
-                "提示2：酚酞是一种常用的酸碱指示剂",
-                "提示3：需要考虑溶液的酸碱性变化",
-                "提示4：A应该是指示剂，B是碱性溶液，C是酸性溶液"
-            ],
-            "difficulty": 2,
-            "category": "酸碱反应",
-            "subcategory": "指示剂变色",
-            "keywords": ["酚酞", "酸碱指示剂", "氢氧化钠", "盐酸", "酸碱性"],
-            "related_concepts": ["酸碱反应", "指示剂", "pH值", "中和反应"],
-            "time_limit": 420,
-            "success_rate": 0.80,
-            "play_count": 120
-        }
-    ]
+    chemistry_problems = []
+    categories = {}
     
-    categories = {
-        "氧化还原反应": {
-            "id": "redox",
-            "description": "涉及电子转移的化学反应",
-            "subcategories": {
-                "指示剂反应": ["chem_001"],
-                "银镜反应": ["chem_002"]
-            }
-        },
-        "酸碱反应": {
-            "id": "acid_base",
-            "description": "酸碱中和及相关反应",
-            "subcategories": {
-                "指示剂变色": ["chem_003"]
-            }
-        }
-    }
+    try:
+        # 从release文件夹加载所有题目
+        release_dir = 'upload/json/release'
+        if not os.path.exists(release_dir):
+            print(f"错误: 题库目录 {release_dir} 不存在")
+            return
+        
+        # 加载所有JSON文件
+        for filename in os.listdir(release_dir):
+            if filename.endswith('.json'):
+                file_path = os.path.join(release_dir, filename)
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        # 检查文件格式
+                        if isinstance(data, dict):
+                            if 'data' in data:
+                                # 旧格式，需要跳过（这些应该已经被转换了）
+                                print(f"警告: {filename} 仍为旧格式，跳过")
+                                continue
+                            else:
+                                # 新格式，直接添加
+                                chemistry_problems.append(data)
+                        else:
+                            print(f"警告: {filename} 格式错误，跳过")
+                            continue
+                except Exception as e:
+                    print(f"加载文件 {filename} 时出错: {e}")
+                    continue
+        
+        # 动态生成categories
+        category_dict = {}
+        for problem in chemistry_problems:
+            category = problem.get('category', '其他')
+            subcategory = problem.get('subcategory', '综合')
+            problem_id = problem.get('id', '')
+            
+            if category not in category_dict:
+                category_dict[category] = {
+                    'id': category.lower().replace('反应', '').replace('化学', ''),
+                    'description': f'{category}相关的化学现象和原理',
+                    'subcategories': {}
+                }
+            
+            if subcategory not in category_dict[category]['subcategories']:
+                category_dict[category]['subcategories'][subcategory] = []
+            
+            if problem_id:
+                category_dict[category]['subcategories'][subcategory].append(problem_id)
+        
+        categories = category_dict
+        print(f"已从release文件夹加载 {len(chemistry_problems)} 个化学题目")
+        print(f"生成了 {len(categories)} 个分类")
+        
+    except Exception as e:
+        print(f"加载化学题库时出错: {e}")
+        chemistry_problems = []
+        categories = {}
 
 # 清理过期会话
 def cleanup_expired_sessions():

@@ -2,91 +2,184 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+This is a Flask-based multiplayer online Chemistry Turtle Soup reasoning game platform that combines AI-driven game hosting with collaborative puzzle-solving. The platform features both regular turtle soup games and specialized chemistry-themed puzzles with built-in problem sets.
+
+**Key Architecture**: Single Flask app (`app.py`) serving both web UI and REST APIs, using in-memory data storage for game sessions and file system for story persistence.
+
 ## Development Commands
 
-- **Install dependencies**: `pip install -r requirements.txt`
-- **Run application**: `python app.py`
-- **Access application**: http://localhost:5000
+### Running the Application
+```bash
+python app.py
+```
+- Starts Flask server on port 5002 (configurable via PORT env var)
+- Serves main game interface at `http://localhost:5002`
+- Provides API test interface at `http://localhost:5002/test`
 
-## High-Level Architecture
+### Installing Dependencies
+```bash
+pip install -r requirements.txt
+```
 
-This is a Flask-based multiplayer "Turtle Soup" (海龟汤) riddle game platform with AI host capabilities. The architecture follows a traditional web application pattern with real-time features implemented via polling.
+### Testing the APIs
+- Access `/test` endpoint for comprehensive API testing interface
+- Use `/health` for health checks
+- Chemistry game APIs are at `/api/game/*` endpoints
+- Original turtle soup APIs use different patterns
+
+## Architecture Overview
 
 ### Core Components
 
-**Backend (app.py)**:
-- Flask web server handling all HTTP routes and API endpoints
-- OpenAI API integration for AI game host functionality 
-- In-memory room storage with thread-safe operations using `rooms_lock`
-- Asynchronous AI processing using ThreadPoolExecutor to prevent blocking
-- File-based story management with approval workflow
+**Flask Application** (`app.py`):
+- Single monolithic Flask app handling both chemistry and original turtle soup games
+- Built-in chemistry problems with educational content (lines 47-131)
+- OpenAI API integration for AI game hosting
+- In-memory session management with automatic cleanup
+- ThreadPoolExecutor for async AI processing
 
-**Frontend**:
-- Single-page application in `static/main.js` with page switching
-- Real-time updates via polling mechanisms (messages, online users, chat)
-- Dual chat system: AI-moderated game chat + regular group chat
+**Game Types**:
+1. **Chemistry Turtle Soup**: Educational chemistry puzzles with pre-loaded problems
+2. **Original Turtle Soup**: User-uploaded story-based puzzles
+
+**Data Storage**:
+- Sessions: In-memory (`active_sessions` dict)
+- Chemistry problems: Built-in + loadable from `data/` directory
+- Original stories: File system in `upload/json/` structure
+- Configuration: `config.json`
 
 ### Key Data Structures
 
-**Room Object**:
+**Chemistry Session**:
 ```python
 {
-    'owner': str,           # Room creator nickname
-    'base_url': str,        # OpenAI API endpoint
-    'api_key': str,         # OpenAI API key
-    'model': str,           # AI model name
-    'messages': [],         # Game conversation history
-    'members': {},          # Room participants
-    'stories': [],          # Uploaded riddle stories
-    'current_story': int,   # Active story index
-    'chat_messages': [],    # Non-AI group chat
-    'online_users': {},     # Heartbeat tracking
+    'session_id': str,
+    'current_problem': str,
+    'problem_data': dict,
+    'conversation_history': list,
+    'hints_used': int,
+    'start_time': float,
+    'status': 'playing'|'completed'
 }
 ```
 
-**Story Format**:
+**Chemistry Problem**:
+```python
+{
+    'id': str,
+    'title': str,
+    'surface': str,           # Question/setup
+    'answer': str,           # Complete explanation
+    'victory_condition': str, # Win condition
+    'hints': list,           # Progressive hints
+    'difficulty': int,       # 1-5 scale
+    'category': str,         # e.g., "氧化还原反应"
+    'keywords': list
+}
+```
+
+## Key Features
+
+### Chemistry Game System
+- Pre-loaded educational chemistry problems covering oxidation-reduction reactions and acid-base chemistry
+- Progressive hint system (max 3 hints per game)
+- AI judges story restoration attempts
+- Automatic session timeout (1 hour default)
+
+### AI Integration
+- OpenAI API with configurable models and endpoints
+- Structured prompt engineering for chemistry education
+- Async processing with ThreadPoolExecutor
+- Built-in error handling and timeout management
+
+### Session Management
+- Memory-based storage (data lost on restart)
+- Automatic cleanup of expired sessions (10-minute intervals)
+- Heart-beat style API for real-time gaming
+
+## API Architecture
+
+### Chemistry Game APIs (`/api/game/*`)
+- `POST /api/game/start` - Start new chemistry game session
+- `POST /api/game/ask` - Submit question to AI host
+- `POST /api/game/hint` - Request progressive hints
+- `GET /api/game/status` - Get current game state
+- `GET /api/categories` - Get problem categories
+- `GET /api/problems` - List available problems
+
+### Original Turtle Soup APIs (`/api/*`)
+- Room-based multiplayer system with invite codes
+- File upload for custom stories
+- Story plaza for community sharing
+- Admin panel for content moderation
+
+## Configuration
+
+### Environment Variables
+- `PORT`: Server port (default: 5002)
+
+### config.json Structure
 ```json
 {
-    "surface": "riddle question",
-    "answer": "complete story/answer", 
-    "victory_condition": "winning criteria",
-    "additional": "optional hints"
+  "ai_settings": {
+    "base_url": "http://api.0ha.top/v1",
+    "api_key": "your-key-here",
+    "model": "gpt-4o-mini"
+  },
+  "game_settings": {
+    "session_timeout": 3600,
+    "max_hints": 3
+  }
 }
 ```
 
-### Game Flow
+## File Structure
 
-1. **Room Creation**: Owner sets up room with OpenAI credentials
-2. **Story Management**: Upload JSON stories or load from story plaza
-3. **AI Interaction**: Players ask yes/no questions, AI responds according to turtle soup rules
-4. **Story Restoration**: Players attempt to reconstruct the full story
-5. **Answer Reveal**: Owner can reveal the answer when appropriate
+**Data Files**:
+- `data/chemistry_problems.json` - External chemistry problem sets
+- `data/categories.json` - Problem categorization
+- `upload/json/release/` - Published community stories
+- `upload/json/norelease/` - Pending story submissions
 
-### Story Plaza System
+**Static Assets**: Currently empty (`static/`, `templates/` directories exist but unused - app serves embedded HTML)
 
-- **Upload Pipeline**: Stories uploaded to `upload/json/norelease/` for admin approval
-- **Approval Process**: Admin moves approved stories to `upload/json/release/`
-- **Story Numbering**: Auto-incrementing counter maintained in `config.json`
-- **One-Click Start**: Direct loading of approved stories into game rooms
+## Testing and Development
 
-### Configuration
+### Built-in Test Interface
+Access `/test` for comprehensive API testing with:
+- Game session management
+- Real-time chat simulation  
+- Hint progression testing
+- API logging and debugging
 
-Critical settings in `config.json`:
-- `preset`: AI host prompt template with game rules
-- `admin`: Admin credentials for story approval and room management
-- `story_counter`: Auto-incrementing story ID counter
-- `options`: Dropdown choices for models, API endpoints, and keys
+### Development Notes
+- Server runs in non-debug mode by default
+- All AI processing is asynchronous to prevent blocking
+- Memory-only storage means sessions don't persist across restarts
+- Chemistry problems have built-in fallbacks if external files missing
 
-### Thread Safety
+## Integration Points
 
-- All room operations protected by `rooms_lock`
-- AI processing handled asynchronously to prevent request blocking
-- Heartbeat system for online user tracking with cleanup
+**AI Model Configuration**: Easily swap OpenAI models via config.json
+**Problem Sets**: Add new chemistry problems via JSON files in `data/` directory
+**UI Extensions**: Can add static files and templates for enhanced frontend
+**Database Migration**: Current in-memory storage can be replaced with persistent storage
 
-### File Storage
+## Common Development Tasks
 
-```
-upload/json/
-├── norelease/    # Pending approval stories
-└── release/      # Published stories available for gameplay
-```
+### Adding New Chemistry Problems
+1. Edit `data/chemistry_problems.json` or modify built-in problems in `load_builtin_problems()`
+2. Follow existing problem structure with required fields
+3. Update categories in `data/categories.json` if needed
+
+### Modifying AI Behavior
+- Edit `ChemistryPromptManager.build_system_prompt()` for game rules
+- Update context dictionaries for different problem categories
+- Adjust victory detection logic in ask_question endpoint
+
+### Extending APIs
+- Add new endpoints following existing pattern in app.py
+- Use consistent JSON response format with error handling
+- Consider async processing for AI-dependent operations

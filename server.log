@@ -51,3 +51,6 @@
 127.0.0.1 - - [17/Sep/2025 08:37:19] "GET /api/categories HTTP/1.1" 200 -
 127.0.0.1 - - [17/Sep/2025 08:37:26] "GET /api/categories HTTP/1.1" 200 -
 127.0.0.1 - - [17/Sep/2025 08:37:40] "GET /api/categories HTTP/1.1" 200 -
+127.0.0.1 - - [17/Sep/2025 09:15:25] "GET /api/problems HTTP/1.1" 200 -
+127.0.0.1 - - [17/Sep/2025 09:15:32] "POST /api/game/start HTTP/1.1" 200 -
+127.0.0.1 - - [17/Sep/2025 09:15:38] "GET /api/problems HTTP/1.1" 200 -
