@@ -1085,12 +1085,18 @@ def api_test_page():
 
 # ==================== 初始化 ====================
 
+# 创建必要的目录（模块级别，确保Gunicorn也能执行）
+os.makedirs('data', exist_ok=True)
+os.makedirs('upload/json/release', exist_ok=True)
+os.makedirs('upload/json/norelease', exist_ok=True)
+os.makedirs('upload/release', exist_ok=True)
+os.makedirs('upload/norelease', exist_ok=True)
+
+# 加载题库 - 必须在模块级别执行
+load_chemistry_problems()
+print(f"[初始化] 成功加载 {len(chemistry_problems)} 个化学题目")
+
 if __name__ == '__main__':
-    # 创建数据目录
-    os.makedirs('data', exist_ok=True)
-    
-    # 加载题库
-    load_chemistry_problems()
     
     # 启动清理线程
     def cleanup_task():
