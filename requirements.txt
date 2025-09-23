@@ -1,6 +1,7 @@
-flask
-flask_cors
-openai
-python-dotenv
+Flask==3.0.0
+Flask-Cors==4.0.0
+openai==1.12.0
+python-dotenv==1.0.0
+gunicorn==21.2.0
 # concurrent.futures为Python3标准库，无需单独安装，若为py2需pip install futures
 # uuid为Python标准库，无需单独安装
