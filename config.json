@@ -1,8 +1,8 @@
 {
   "ai_settings": {
-    "base_url": "http://api.0ha.top/v1",
-    "api_key": "sk-gmQZM42fY9vraXVeC9047984D8B240C38082EeEdD284A08d",
-    "model": "gpt-4o-mini",
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "api_key": "7a954c5e-10f2-456f-9439-611c6b5d7be8",
+    "model": "doubao-lite-32k-character-250228",
     "timeout": 30,
     "max_retries": 3
   },
