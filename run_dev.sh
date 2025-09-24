@@ -6,6 +6,19 @@ echo "======================================="
 echo "启动开发服务器（开发模式）"
 echo "======================================="
 
+# 检查并关闭占用 5002 端口的进程
+PORT=5002
+PIDS=$(lsof -ti:$PORT)
+if [ ! -z "$PIDS" ]; then
+    echo "发现端口 $PORT 被占用，正在关闭相关进程..."
+    for PID in $PIDS; do
+        echo "  关闭进程 PID: $PID"
+        kill -9 $PID 2>/dev/null
+    done
+    echo "已清理端口 $PORT"
+    sleep 1
+fi
+
 # 添加用户 Python bin 目录到 PATH（用于 macOS）
 export PATH="$HOME/Library/Python/3.9/bin:$PATH"
 
