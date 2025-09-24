@@ -25,7 +25,8 @@ ssh $SERVER_USER@$SERVER_IP "mkdir -p /var/www/turtle_soup"
 
 # 2. 打包并上传项目文件（排除不需要的文件）
 echo -e "${YELLOW}[2/8] 上传项目文件...${NC}"
-rsync -avz --exclude='.venv/' \
+rsync -avz --checksum \
+           --exclude='.venv/' \
            --exclude='venv/' \
            --exclude='__pycache__/' \
            --exclude='.git/' \
@@ -91,9 +92,15 @@ systemctl daemon-reload
 systemctl enable turtle_soup
 EOF
 
-# 6. 停止旧服务（如果存在）
-echo -e "${YELLOW}[6/8] 停止旧服务...${NC}"
-ssh $SERVER_USER@$SERVER_IP "systemctl stop turtle_soup 2>/dev/null || true"
+# 6. 停止旧服务并清理缓存
+echo -e "${YELLOW}[6/8] 停止旧服务并清理缓存...${NC}"
+ssh $SERVER_USER@$SERVER_IP << 'EOF'
+systemctl stop turtle_soup 2>/dev/null || true
+# 清理 Python 字节码缓存
+find /var/www/turtle_soup -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find /var/www/turtle_soup -type f -name "*.pyc" -delete 2>/dev/null || true
+echo "已清理 Python 缓存"
+EOF
 
 # 7. 启动新服务
 echo -e "${YELLOW}[7/8] 启动服务...${NC}"
