@@ -78,7 +78,7 @@ Group=root
 WorkingDirectory=/var/www/turtle_soup
 Environment="PATH=/var/www/turtle_soup/venv/bin"
 Environment="PYTHONPATH=/var/www/turtle_soup"
-ExecStart=/var/www/turtle_soup/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:5002 --timeout 120 --access-logfile - --error-logfile - app:app
+ExecStart=/var/www/turtle_soup/venv/bin/gunicorn --workers 1 --bind 0.0.0.0:5002 --timeout 120 --access-logfile - --error-logfile - app:app
 Restart=always
 RestartSec=10
 
