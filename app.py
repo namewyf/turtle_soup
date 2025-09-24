@@ -238,12 +238,26 @@ def ask_question():
         # 异步调用AI
         def get_ai_response():
             try:
-                client = OpenAI(base_url=AI_BASE_URL, api_key=AI_API_KEY)
-                completion = client.chat.completions.create(
-                    model=AI_MODEL,
-                    messages=messages
-                )
-                return completion.choices[0].message.content
+                # 临时清除代理环境变量，避免与某些版本的 OpenAI 库冲突
+                import os
+                old_http_proxy = os.environ.pop('HTTP_PROXY', None)
+                old_https_proxy = os.environ.pop('HTTPS_PROXY', None)
+                old_http_proxy_lower = os.environ.pop('http_proxy', None)
+                old_https_proxy_lower = os.environ.pop('https_proxy', None)
+
+                try:
+                    client = OpenAI(base_url=AI_BASE_URL, api_key=AI_API_KEY)
+                    completion = client.chat.completions.create(
+                        model=AI_MODEL,
+                        messages=messages
+                    )
+                    return completion.choices[0].message.content
+                finally:
+                    # 恢复代理环境变量
+                    if old_http_proxy: os.environ['HTTP_PROXY'] = old_http_proxy
+                    if old_https_proxy: os.environ['HTTPS_PROXY'] = old_https_proxy
+                    if old_http_proxy_lower: os.environ['http_proxy'] = old_http_proxy_lower
+                    if old_https_proxy_lower: os.environ['https_proxy'] = old_https_proxy_lower
             except Exception as e:
                 return f"[AI错误] {str(e)}"
         
